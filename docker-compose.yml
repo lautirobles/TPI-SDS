@@ -1,0 +1,122 @@
+# ============================================================================
+#  Laboratorio SQLi  -  Topologia de 4 servicios
+#  3000 = app vulnerable (desnuda)   | usuario BD: app_root  (FILE + ALL)
+#  8080 = WAF (ModSecurity + CRS) -> proxy a app vulnerable
+#  3001 = app remediada             | usuario BD: app_least (minimo privilegio)
+#  ADVERTENCIA: entorno deliberadamente inseguro. Solo uso local/educativo.
+# ============================================================================
+services:
+  db:
+    image: mysql:8.0
+    container_name: sqli-db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: shopdb
+    # --local-infile=1 y secure-file-priv abierto habilitan LOAD_FILE / INTO OUTFILE
+    # (necesarios para demostrar el impacto del privilegio FILE y el intento de os-shell)
+    command: >
+      --local-infile=1
+      --secure-file-priv=
+      --general-log=0
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d:ro
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prootpw"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  app-vuln:
+    build: ./app
+    container_name: sqli-app-vuln
+    environment:
+      MODE: vulnerable
+      DB_HOST: db
+      DB_USER: app_root
+      DB_PASS: app_root_pw
+      DB_NAME: shopdb
+      PORT: "3000"
+      SESSION_SECRET: lab-vuln-secret
+      DEBUG_SQL: "true"      # muestra en pantalla la query cruda ejecutada
+      NAIVE_FILTER: "false"  # poner "true" para activar la blacklist ingenua (demo de tampers a nivel app)
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  # Variante con filtro ingenuo (blacklist) a nivel aplicacion -> demo de evasion con tampers.
+  app-vuln-filter:
+    build: ./app
+    container_name: sqli-app-vuln-filter
+    environment:
+      MODE: vulnerable
+      DB_HOST: db
+      DB_USER: app_root
+      DB_PASS: app_root_pw
+      DB_NAME: shopdb
+      PORT: "3002"
+      SESSION_SECRET: lab-vuln-filter-secret
+      DEBUG_SQL: "false"
+      NAIVE_FILTER: "true"    # <--- blacklist activada
+    ports:
+      - "3002:3002"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  waf:
+    image: owasp/modsecurity-crs:4.25-nginx-alpine-lts
+    container_name: sqli-waf
+    environment:
+      # Reverse proxy hacia la app vulnerable
+      BACKEND: http://app-vuln:3000
+      PORT: "8080"
+      SERVER_NAME: localhost
+      # Motor en modo bloqueo con scoring de anomalias (CRS)
+      MODSEC_RULE_ENGINE: "On"
+      PARANOIA: "1"
+      BLOCKING_PARANOIA: "1"
+      ANOMALY_INBOUND: "5"
+      ANOMALY_OUTBOUND: "4"
+      MODSEC_AUDIT_ENGINE: "RelevantOnly"
+      MODSEC_AUDIT_LOG: "/dev/stdout"
+    ports:
+      - "8080:8080"
+    depends_on:
+      app-vuln:
+        condition: service_healthy
+    restart: unless-stopped
+
+  app-secure:
+    build: ./app
+    container_name: sqli-app-secure
+    environment:
+      MODE: secure
+      DB_HOST: db
+      DB_USER: app_least
+      DB_PASS: app_least_pw
+      DB_NAME: shopdb
+      PORT: "3001"
+      SESSION_SECRET: lab-secure-secret
+      DEBUG_SQL: "false"
+      NAIVE_FILTER: "false"
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  dbdata:

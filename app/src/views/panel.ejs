@@ -1,0 +1,13 @@
+<%- include('partials/header') %>
+<h1>Panel privado</h1>
+<p>Sesi&oacute;n iniciada como <strong><%= user.username %></strong> con rol <strong><%= user.role %></strong>.</p>
+<h2>Datos sensibles (tabla <code>secrets</code>)</h2>
+<table class="tbl">
+  <thead><tr><th>Etiqueta</th><th>Valor</th><th>API token</th></tr></thead>
+  <tbody>
+    <% secrets.forEach(function(s){ %>
+      <tr><td><%= s.label %></td><td><%= s.secret_value %></td><td><code><%= s.api_token %></code></td></tr>
+    <% }); %>
+  </tbody>
+</table>
+<%- include('partials/footer') %>

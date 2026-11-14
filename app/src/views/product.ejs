@@ -1,0 +1,17 @@
+<%- include('partials/header') %>
+<p><a href="/">&larr; Volver al cat&aacute;logo</a></p>
+<% if (error) { %>
+  <div class="alert"><%= error %></div>
+<% } %>
+<% if (product) { %>
+  <article class="detail">
+    <h1><%= product.name %></h1>
+    <p class="muted">Categor&iacute;a: <%= product.category %> &middot; ID: <%= product.id %></p>
+    <p><%= product.description %></p>
+    <div class="row">
+      <span class="price">$ <%= product.price %></span>
+      <span class="stock">stock: <%= product.stock %></span>
+    </div>
+  </article>
+<% } %>
+<%- include('partials/footer') %>

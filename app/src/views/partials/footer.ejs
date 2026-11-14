@@ -1,0 +1,16 @@
+  </main>
+  <% if (debugSqlEnabled && debugSql && debugSql.length) { %>
+    <section class="debug-panel">
+      <h3>&#128270; SQL ejecutado (modo debug)</h3>
+      <p class="muted">Panel did&aacute;ctico: muestra la consulta cruda que se arm&oacute; concatenando tu entrada.</p>
+      <% debugSql.forEach(function(s){ %>
+        <pre class="sql"><%= s %></pre>
+      <% }); %>
+    </section>
+  <% } %>
+  <footer class="foot">
+    <span>ShopLab &mdash; laboratorio educativo de SQL Injection</span>
+    <span class="muted">No desplegar en producci&oacute;n.</span>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<%- include('partials/header') %>
+
+<h1>Cat&aacute;logo de productos</h1>
+
+<form class="search" method="get" action="/">
+  <input type="text" name="q" value="<%= q %>" placeholder="Buscar productos... (par&aacute;metro q)">
+  <label>Ordenar por
+    <select name="sort">
+      <% ['id','name','price','stock','category'].forEach(function(c){ %>
+        <option value="<%= c %>" <%= sort===c?'selected':'' %>><%= c %></option>
+      <% }); %>
+    </select>
+  </label>
+  <label>Dir
+    <select name="order">
+      <option value="ASC"  <%= order==='ASC'?'selected':'' %>>ASC</option>
+      <option value="DESC" <%= order==='DESC'?'selected':'' %>>DESC</option>
+    </select>
+  </label>
+  <button type="submit">Buscar</button>
+</form>
+
+<% if (error) { %>
+  <div class="alert"><strong>Error SQL:</strong> <%= error %></div>
+<% } %>
+
+<div class="grid">
+  <% products.forEach(function(p){ %>
+    <article class="card">
+      <h3><a href="/products/<%= p.id %>"><%= p.name %></a></h3>
+      <p class="muted"><%= p.category %></p>
+      <p class="desc"><%= (p.description||'').substring(0,80) %></p>
+      <div class="row">
+        <span class="price">$ <%= p.price %></span>
+        <span class="stock">stock: <%= p.stock %></span>
+      </div>
+    </article>
+  <% }); %>
+</div>
+<% if (!products.length && !error) { %><p class="muted">Sin resultados.</p><% } %>
+
+<%- include('partials/footer') %>

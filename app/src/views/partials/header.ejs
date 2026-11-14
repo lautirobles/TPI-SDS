@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ShopLab<%= isVuln ? ' (vulnerable)' : ' (seguro)' %></title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="<%= isVuln ? 'env-vuln' : 'env-secure' %>">
+  <div class="env-banner">
+    <% if (isVuln) { %>
+      &#128308; ENTORNO VULNERABLE &middot; puerto 3000 &middot; usuario BD de alto privilegio
+    <% } else { %>
+      &#128994; ENTORNO REMEDIADO &middot; puerto 3001 &middot; usuario BD de m&iacute;nimo privilegio
+    <% } %>
+  </div>
+  <header class="topbar">
+    <a class="brand" href="/">&#128722; ShopLab</a>
+    <nav>
+      <a href="/">Cat&aacute;logo</a>
+      <% if (user) { %>
+        <a href="/panel">Panel</a>
+        <span class="who">Hola, <%= user.username %> (<%= user.role %>)</span>
+        <form method="post" action="/logout" class="inline"><button class="link">Salir</button></form>
+      <% } else { %>
+        <a href="/login">Ingresar</a>
+      <% } %>
+    </nav>
+  </header>
+  <main class="container">

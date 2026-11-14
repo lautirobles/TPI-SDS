@@ -1,0 +1,19 @@
+{
+  "name": "sqli-lab-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mini-tienda con endpoints vulnerables / remediados a SQLi (laboratorio educativo)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "seed:hash": "node src/tools/genhash.js"
+  },
+  "dependencies": {
+    "bcryptjs": "2.4.3",
+    "ejs": "3.1.10",
+    "express": "4.21.2",
+    "express-session": "1.18.1",
+    "mysql2": "3.11.5",
+    "sequelize": "6.37.5"
+  }
+}
