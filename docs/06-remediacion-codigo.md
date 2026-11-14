@@ -4,6 +4,11 @@ Causa raíz: **datos del usuario que se convierten en código SQL**. La solució
 **separar datos de código** mediante consultas parametrizadas, y usar correctamente el
 ORM. Comparación por endpoint (`routes/vulnerable.js` → `routes/secure.js`).
 
+> **Alcance del laboratorio:** solo **dos** endpoints quedaron vulnerables a propósito —
+> **6.1 Login** y **6.2 Buscador**. Los apartados **6.3 a 6.5** muestran otros patrones de
+> mala praxis del ORM y su forma correcta como **material de referencia**; en esta app ya
+> están implementados de forma segura en *ambos* entornos (no son inyectables).
+
 ## 6.1 — Login
 
 **Vulnerable** (interpolación + password comparado en SQL):

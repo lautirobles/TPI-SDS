@@ -28,11 +28,18 @@ usemos el ORM "bien", un `ORDER BY ${columna}` tomada del usuario **no se puede*
 parametrizar: la única defensa es una **whitelist** explícita. Es la clase de SQLi
 más fácil de pasar por alto porque "parece" que el ORM nos cubre.
 
-## Patrones de mala praxis demostrados en este laboratorio
-1. **Raw query interpolada** — `routes/vulnerable.js`, login y búsqueda.
-2. **`literal()` interpolado** — `routes/vulnerable.js`, `GET /api/products`.
-3. **Inyección de identificador en `ORDER BY`** — `routes/vulnerable.js`, `sort`/`order`.
-4. **Comparación de credenciales dentro del SQL** — habilita el *auth bypass*.
+## Patrones de mala praxis en este laboratorio
+
+**Explotables (las 2 vulnerabilidades del lab)** — `routes/vulnerable.js`:
+1. **Raw query interpolada en el login** → `WHERE username='${u}' AND pass_plain='${p}'`.
+   Comparar credenciales dentro del SQL habilita el *auth bypass* (`admin' -- `).
+2. **Raw query interpolada en el buscador** → `WHERE name LIKE '%${q}%'`, permite
+   `UNION SELECT` para extraer datos.
+
+**De referencia (documentados, pero implementados de forma segura en el lab):**
+3. **`literal()` interpolado** — `Model.findAll({ where: literal(\`...${x}\`) })`.
+4. **Inyección de identificador en `ORDER BY`** — `order:[[literal(sort), order]]`; se
+   mitiga con **whitelist** (ningún ORM parametriza identificadores). Ver `06`.
 
 ## CVEs reales de Sequelize (respaldo teórico)
 No son solo malas prácticas del desarrollador; el propio ORM tuvo fallas explotables:

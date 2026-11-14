@@ -5,7 +5,6 @@ const session = require('express-session');
 const { sequelize, MODE, isVuln } = require('./db/sequelize');
 
 const PORT = Number(process.env.PORT || 3000);
-const NAIVE_FILTER = process.env.NAIVE_FILTER === 'true';
 const DEBUG_SQL = process.env.DEBUG_SQL === 'true';
 
 const app = express();
@@ -30,12 +29,6 @@ app.use((req, res, next) => {
   res.locals.user = req.session.user || null;
   next();
 });
-
-// Filtro ingenuo (solo vulnerable + NAIVE_FILTER=true): demo de evasion con tampers.
-if (isVuln && NAIVE_FILTER) {
-  app.use(require('./middleware/naiveFilter'));
-  console.log('[naiveFilter] blacklist activada');
-}
 
 // Carga de rutas segun el modo.
 const routes = isVuln ? require('./routes/vulnerable') : require('./routes/secure');

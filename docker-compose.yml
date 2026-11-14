@@ -41,7 +41,6 @@ services:
       PORT: "3000"
       SESSION_SECRET: lab-vuln-secret
       DEBUG_SQL: "true"      # muestra en pantalla la query cruda ejecutada
-      NAIVE_FILTER: "false"  # poner "true" para activar la blacklist ingenua (demo de tampers a nivel app)
     ports:
       - "3000:3000"
     depends_on:
@@ -52,27 +51,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
-    restart: unless-stopped
-
-  # Variante con filtro ingenuo (blacklist) a nivel aplicacion -> demo de evasion con tampers.
-  app-vuln-filter:
-    build: ./app
-    container_name: sqli-app-vuln-filter
-    environment:
-      MODE: vulnerable
-      DB_HOST: db
-      DB_USER: app_root
-      DB_PASS: app_root_pw
-      DB_NAME: shopdb
-      PORT: "3002"
-      SESSION_SECRET: lab-vuln-filter-secret
-      DEBUG_SQL: "false"
-      NAIVE_FILTER: "true"    # <--- blacklist activada
-    ports:
-      - "3002:3002"
-    depends_on:
-      db:
-        condition: service_healthy
     restart: unless-stopped
 
   waf:
@@ -110,7 +88,6 @@ services:
       PORT: "3001"
       SESSION_SECRET: lab-secure-secret
       DEBUG_SQL: "false"
-      NAIVE_FILTER: "false"
     ports:
       - "3001:3001"
     depends_on:

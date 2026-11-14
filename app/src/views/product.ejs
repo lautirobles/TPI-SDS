@@ -1,16 +1,31 @@
 <%- include('partials/header') %>
-<p><a href="/">&larr; Volver al cat&aacute;logo</a></p>
+<%
+  var CAT = {
+    'Perifericos':'⌨️','Monitores':'🖥️','Audio':'🎧','Video':'📷',
+    'Almacenamiento':'💾','Componentes':'🧠','Mobiliario':'🪑','Accesorios':'🔌','Redes':'📶'
+  };
+%>
+<p style="margin:0 0 16px"><a href="/">&larr; Volver al cat&aacute;logo</a></p>
+
 <% if (error) { %>
-  <div class="alert"><%= error %></div>
+  <div class="alert"><span>&#9888;&#65039;</span><div><%= error %></div></div>
 <% } %>
+
 <% if (product) { %>
   <article class="detail">
-    <h1><%= product.name %></h1>
-    <p class="muted">Categor&iacute;a: <%= product.category %> &middot; ID: <%= product.id %></p>
-    <p><%= product.description %></p>
-    <div class="row">
-      <span class="price">$ <%= product.price %></span>
-      <span class="stock">stock: <%= product.stock %></span>
+    <div class="big-thumb" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe)">
+      <%= CAT[product.category] || '📦' %>
+    </div>
+    <div>
+      <span class="chip"><%= product.category %></span>
+      <h1 style="margin:10px 0 6px"><%= product.name %></h1>
+      <p class="muted small">ID #<%= product.id %></p>
+      <p style="color:var(--ink-soft)"><%= product.description %></p>
+      <div style="display:flex;align-items:center;gap:18px;margin-top:18px">
+        <span class="price" style="font-size:28px">$<%= product.price %></span>
+        <span class="badge <%= Number(product.stock) > 20 ? 'ok' : 'low' %>"><%= product.stock %> en stock</span>
+      </div>
+      <div style="margin-top:22px"><button class="btn">&#128722; Agregar al carrito</button></div>
     </div>
   </article>
 <% } %>

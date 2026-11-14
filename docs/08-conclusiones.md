@@ -8,18 +8,22 @@ análisis ofensivo (manual + automatizado), evaluación de impacto y defensa en 
 infraestructura.
 
 ## Hallazgos clave
-1. **Un ORM no previene SQLi por sí solo.** Las malas prácticas (raw query interpolada,
-   `literal()`, identificadores en `ORDER BY`, comparar credenciales en SQL) reintroducen
-   la vulnerabilidad. Se demostraron las 4 técnicas: UNION, Error-based, Boolean-blind y
-   Time-based blind, más el bypass de autenticación.
-2. **El identificador en `ORDER BY` es un punto ciego**: ningún *prepared statement*
-   parametriza nombres de columna; la única defensa es la **whitelist**.
-3. **El impacto escala con el privilegio.** Con `FILE` se leyó el sistema de archivos del
-   host de BD (`/etc/passwd`) y se habilitó el intento de `--os-shell`. Con **mínimo
-   privilegio** ese techo desaparece.
-4. **Los controles por blacklist fallan**: un filtro case-sensitive se evade con
-   `--tamper=lowercase`. Un **WAF (CRS)** es mucho más robusto (normaliza y bloquea), pero
-   **no es infalible** ni reemplaza corregir el código.
+1. **Un ORM no previene SQLi por sí solo.** Usando Sequelize **mal** (`sequelize.query`
+   con interpolación, comparar credenciales en SQL) se reintrodujeron dos inyecciones:
+   el **bypass de autenticación** en el login y la **extracción de datos por UNION** en el
+   buscador. Usando el ORM **bien** (parámetros/`Op`, `bcrypt`, validación), ambas desaparecen.
+2. **Los identificadores no se parametrizan.** Aunque el ordenamiento no quedó como
+   vulnerabilidad activa, se lo protegió con **whitelist** justamente porque ningún
+   *prepared statement* parametriza nombres de columna o dirección de orden: es el punto
+   ciego clásico cuando se confía ciegamente en el ORM.
+3. **El impacto escala con el privilegio.** Con `FILE`, la inyección del buscador permitió
+   leer el sistema de archivos del host de BD (`LOAD_FILE('/etc/passwd')` → 575 bytes) y
+   habilitar el intento de `--os-shell`. Con **mínimo privilegio** (`app_least`) ese techo
+   desaparece (`LOAD_FILE` → NULL).
+4. **El WAF ayuda pero no alcanza.** CRS bloqueó la extracción por UNION incluso con
+   tampers (`randomcase`, `space2comment`, `charencode`) → es robusto. Pero el bypass de
+   login `admin' -- ` **atravesó el WAF** (302): no cubre el 100% ni reemplaza corregir el
+   código.
 
 ## La jerarquía de defensa (lección central)
 | Capa | Qué aporta | ¿Suficiente sola? |

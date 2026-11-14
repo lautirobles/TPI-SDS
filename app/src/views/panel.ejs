@@ -1,7 +1,13 @@
 <%- include('partials/header') %>
-<h1>Panel privado</h1>
-<p>Sesi&oacute;n iniciada como <strong><%= user.username %></strong> con rol <strong><%= user.role %></strong>.</p>
-<h2>Datos sensibles (tabla <code>secrets</code>)</h2>
+<div class="panel-head">
+  <span class="avatar"><%= user.username.charAt(0).toUpperCase() %></span>
+  <div>
+    <h1 style="margin:0;font-size:20px">Panel privado</h1>
+    <p class="muted small" style="margin:2px 0 0">Sesi&oacute;n: <b><%= user.username %></b> &middot; rol <b><%= user.role %></b></p>
+  </div>
+</div>
+
+<h2 style="font-size:16px;margin:0 0 10px">Datos sensibles &mdash; tabla <code>secrets</code></h2>
 <table class="tbl">
   <thead><tr><th>Etiqueta</th><th>Valor</th><th>API token</th></tr></thead>
   <tbody>

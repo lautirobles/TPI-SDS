@@ -2,39 +2,45 @@
 /* ===========================================================================
  *  RUTAS VULNERABLES  (MODE=vulnerable)
  *  -------------------------------------------------------------------------
- *  TODAS las consultas construyen SQL concatenando entrada del usuario.
- *  Se usa Sequelize, demostrando que el ORM NO protege cuando se lo usa mal:
- *    - sequelize.query(`... ${input} ...`)      -> SQL crudo interpolado
- *    - Model.findAll({ where: literal(`${in}`) }) -> literal() con interpolacion
- *    - order:[[ literal(input), ... ]]           -> inyeccion de IDENTIFICADOR
- *                                                   (un ORM NO puede parametrizar
- *                                                    nombres de columna/orden)
- *  NO USAR ESTE CODIGO COMO REFERENCIA. Es un anti-ejemplo intencional.
+ *  EXACTAMENTE DOS vulnerabilidades SQLi (el resto del sitio es seguro):
+ *
+ *   (1) LOGIN  (POST /login)  -> Bypass de autenticacion.
+ *       La verificacion de credenciales se hace concatenando la entrada dentro
+ *       del SQL, por lo que 'admin' --  o  ' OR '1'='1' --  evaden el password.
+ *
+ *   (2) BUSCADOR (GET /?q=)   -> Extraccion de datos (UNION-based).
+ *       El termino de busqueda se interpola en la consulta; permite UNION SELECT
+ *       para volcar otras tablas (users, secrets, ...).
+ *
+ *  Demuestra que Sequelize (ORM) NO protege si se usa mal: aca se usa
+ *  sequelize.query(`... ${input} ...`) en lugar de parametros.
+ *  NO USAR COMO REFERENCIA. Es un anti-ejemplo intencional.
  * =========================================================================== */
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const { QueryTypes, literal } = require('sequelize');
+const { QueryTypes } = require('sequelize');
 const { sequelize } = require('../db/sequelize');
 const { Product } = require('../db/models');
 
 const router = express.Router();
 const DEBUG_SQL = process.env.DEBUG_SQL === 'true';
 
-// Helper: adjunta la query cruda ejecutada para mostrarla en pantalla (panel debug).
-function dbg(res, sql) {
-  if (DEBUG_SQL) res.locals.debugSql = (res.locals.debugSql || []).concat(sql);
-}
+// Ordenamiento: es una funcion de UI, NO una vulnerabilidad -> whitelist en ambas apps.
+const SORT_WHITELIST = new Set(['id', 'name', 'price', 'stock', 'category']);
+const ORDER_WHITELIST = new Set(['ASC', 'DESC']);
+function safeSort(v) { return SORT_WHITELIST.has(v) ? v : 'id'; }
+function safeOrder(v) { return ORDER_WHITELIST.has((v || '').toUpperCase()) ? v.toUpperCase() : 'ASC'; }
+
+function dbg(res, sql) { if (DEBUG_SQL) res.locals.debugSql = (res.locals.debugSql || []).concat(sql); }
 
 /* ---------------------------------------------------------------------------
- *  HOME / CATALOGO + BUSQUEDA + ORDEN
- *  Puntos de inyeccion: q (UNION-based), sort y order (ORDER BY / identifier).
+ *  (2) BUSCADOR  ->  VULNERABLE (UNION-based data extraction)
  * ------------------------------------------------------------------------- */
-router.get('/', async (req, res, next) => {
-  const q     = req.query.q     || '';
-  const sort  = req.query.sort  || 'id';
-  const order = req.query.order || 'ASC';
+router.get('/', async (req, res) => {
+  const q = req.query.q || '';
+  const sort = safeSort(req.query.sort);
+  const order = safeOrder(req.query.order);
   try {
-    // VULNERABLE: q interpolado dentro de un LIKE, y sort/order como identificadores.
+    // VULNERABLE: q se interpola directamente en el SQL (sort/order van por whitelist).
     const sql =
       "SELECT id, name, description, price, stock, category " +
       "FROM products " +
@@ -44,49 +50,26 @@ router.get('/', async (req, res, next) => {
     const products = await sequelize.query(sql, { type: QueryTypes.SELECT });
     res.render('home', { products, q, sort, order, error: null });
   } catch (err) {
-    // Se expone el error de la BD a proposito -> habilita Error-based.
+    // Se expone el error de la BD (ayuda a construir el UNION correcto).
     res.render('home', { products: [], q, sort, order, error: err.message });
   }
 });
 
 /* ---------------------------------------------------------------------------
- *  DETALLE DE PRODUCTO  ->  Error-based / Boolean-blind (contexto numerico)
+ *  DETALLE DE PRODUCTO  ->  SEGURO (validacion de tipo + findByPk)
  * ------------------------------------------------------------------------- */
 router.get('/products/:id', async (req, res) => {
-  const id = req.params.id;
-  try {
-    // VULNERABLE: id sin comillas (contexto numerico). Ideal para extractvalue/updatexml.
-    const sql = "SELECT id, name, description, price, stock, category FROM products WHERE id = " + id;
-    dbg(res, sql);
-    const rows = await sequelize.query(sql, { type: QueryTypes.SELECT });
-    if (!rows.length) return res.status(404).render('product', { product: null, error: 'No encontrado' });
-    res.render('product', { product: rows[0], error: null });
-  } catch (err) {
-    res.status(500).render('product', { product: null, error: err.message });
+  const id = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).render('product', { product: null, error: 'ID invalido' });
   }
+  const product = await Product.findByPk(id);
+  if (!product) return res.status(404).render('product', { product: null, error: 'No encontrado' });
+  res.render('product', { product, error: null });
 });
 
 /* ---------------------------------------------------------------------------
- *  API JSON  ->  Time-based blind.  Mala praxis de ORM: literal() interpolado.
- * ------------------------------------------------------------------------- */
-router.get('/api/products', async (req, res) => {
-  const minStock = req.query.minStock || '0';
-  try {
-    // VULNERABLE: literal() con interpolacion dentro de una llamada "de ORM".
-    const products = await Product.findAll({
-      attributes: ['id', 'name', 'price', 'stock'],
-      where: literal('stock >= ' + minStock),   // <- inyeccion (SLEEP, etc.)
-    });
-    res.json({ count: products.length, products });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/* ---------------------------------------------------------------------------
- *  LOGIN  ->  Auth bypass (' OR '1'='1' -- ), Error/Boolean en ambos campos.
- *  La verificacion de password se hace EN EL SQL (comparacion por string),
- *  por eso ' OR '1'='1 evade la autenticacion.
+ *  (1) LOGIN  ->  VULNERABLE (auth bypass)
  * ------------------------------------------------------------------------- */
 router.get('/login', (req, res) => res.render('login', { error: null, info: null }));
 
@@ -94,7 +77,7 @@ router.post('/login', async (req, res) => {
   const username = req.body.username || '';
   const password = req.body.password || '';
   try {
-    // VULNERABLE: ambos campos concatenados. pass_plain comparado como string.
+    // VULNERABLE: ambos campos concatenados; password comparado como string en SQL.
     const sql =
       "SELECT id, username, role FROM users " +
       "WHERE username = '" + username + "' AND pass_plain = '" + password + "'";
@@ -120,7 +103,7 @@ router.get('/panel', async (req, res) => {
   let secrets = [];
   try {
     secrets = await sequelize.query('SELECT label, secret_value, api_token FROM secrets', { type: QueryTypes.SELECT });
-  } catch (_) { /* usuario de BD podria no tener acceso */ }
+  } catch (_) { /* noop */ }
   res.render('panel', { user: req.session.user, secrets });
 });
 

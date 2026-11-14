@@ -1,42 +1,63 @@
 <%- include('partials/header') %>
+<%
+  // Mapa categoria -> icono + gradiente (solo presentacion).
+  var CAT = {
+    'Perifericos':    { i:'⌨️', g:'linear-gradient(135deg,#e0e7ff,#c7d2fe)' },
+    'Monitores':      { i:'🖥️', g:'linear-gradient(135deg,#ede9fe,#ddd6fe)' },
+    'Audio':          { i:'🎧', g:'linear-gradient(135deg,#fce7f3,#fbcfe8)' },
+    'Video':          { i:'📷', g:'linear-gradient(135deg,#cffafe,#a5f3fc)' },
+    'Almacenamiento': { i:'💾', g:'linear-gradient(135deg,#dcfce7,#bbf7d0)' },
+    'Componentes':    { i:'🧠', g:'linear-gradient(135deg,#ffedd5,#fed7aa)' },
+    'Mobiliario':     { i:'🪑', g:'linear-gradient(135deg,#fef9c3,#fde68a)' },
+    'Accesorios':     { i:'🔌', g:'linear-gradient(135deg,#f3e8ff,#e9d5ff)' },
+    'Redes':          { i:'📶', g:'linear-gradient(135deg,#ccfbf1,#99f6e4)' }
+  };
+  function cat(c){ return CAT[c] || { i:'📦', g:'linear-gradient(135deg,#e5e7eb,#d1d5db)' }; }
+%>
 
-<h1>Cat&aacute;logo de productos</h1>
 
-<form class="search" method="get" action="/">
-  <input type="text" name="q" value="<%= q %>" placeholder="Buscar productos... (par&aacute;metro q)">
-  <label>Ordenar por
-    <select name="sort">
+
+<div class="toolbar">
+  <span class="count"><%= products.length %> resultado<%= products.length === 1 ? '' : 's' %></span>
+  <% if (typeof q !== 'undefined' && q) { %><span class="chip">b&uacute;squeda: &ldquo;<%= q %>&rdquo;</span><% } %>
+  <span class="spacer"></span>
+  <form method="get" action="/">
+    <input type="hidden" name="q" value="<%= q %>">
+    <label class="muted small">Ordenar</label>
+    <select name="sort" onchange="this.form.submit()">
       <% ['id','name','price','stock','category'].forEach(function(c){ %>
         <option value="<%= c %>" <%= sort===c?'selected':'' %>><%= c %></option>
       <% }); %>
     </select>
-  </label>
-  <label>Dir
-    <select name="order">
-      <option value="ASC"  <%= order==='ASC'?'selected':'' %>>ASC</option>
-      <option value="DESC" <%= order==='DESC'?'selected':'' %>>DESC</option>
+    <select name="order" onchange="this.form.submit()">
+      <option value="ASC"  <%= order==='ASC'?'selected':'' %>>&uarr; ASC</option>
+      <option value="DESC" <%= order==='DESC'?'selected':'' %>>&darr; DESC</option>
     </select>
-  </label>
-  <button type="submit">Buscar</button>
-</form>
+  </form>
+</div>
 
 <% if (error) { %>
-  <div class="alert"><strong>Error SQL:</strong> <%= error %></div>
+  <div class="alert"><span>&#9888;&#65039;</span><div><b>Error SQL:</b> <%= error %></div></div>
 <% } %>
 
 <div class="grid">
-  <% products.forEach(function(p){ %>
+  <% products.forEach(function(p){ var c = cat(p.category); %>
     <article class="card">
-      <h3><a href="/products/<%= p.id %>"><%= p.name %></a></h3>
-      <p class="muted"><%= p.category %></p>
-      <p class="desc"><%= (p.description||'').substring(0,80) %></p>
-      <div class="row">
-        <span class="price">$ <%= p.price %></span>
-        <span class="stock">stock: <%= p.stock %></span>
+      <div class="thumb" style="background:<%= c.g %>">
+        <% if (p.category) { %><span class="cat"><%= p.category %></span><% } %>
+        <span><%= c.i %></span>
+      </div>
+      <div class="card-body">
+        <h3><a href="/products/<%= p.id %>"><%= p.name %></a></h3>
+        <p class="desc"><%= (p.description || '').substring(0,70) %></p>
+        <div class="card-foot">
+          <span class="price">$<%= p.price %></span>
+          <span class="badge <%= Number(p.stock) > 20 ? 'ok' : 'low' %>"><%= Number(p.stock) > 20 ? 'En stock' : 'Pocas unidades' %></span>
+        </div>
       </div>
     </article>
   <% }); %>
 </div>
-<% if (!products.length && !error) { %><p class="muted">Sin resultados.</p><% } %>
+<% if (!products.length && !error) { %><p class="empty">Sin resultados para tu b&uacute;squeda.</p><% } %>
 
 <%- include('partials/footer') %>

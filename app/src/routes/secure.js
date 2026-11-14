@@ -2,13 +2,12 @@
 /* ===========================================================================
  *  RUTAS REMEDIADAS  (MODE=secure)
  *  -------------------------------------------------------------------------
- *  Mismas funcionalidades, uso CORRECTO del ORM + defensa en profundidad:
- *   - Consultas parametrizadas (replacements / operadores Op). El valor del
- *     usuario viaja como PARAMETRO, nunca como parte del texto SQL.
- *   - ORDER BY: como un ORM NO parametriza identificadores, se usa WHITELIST
- *     explicita de columnas y un ENUM de direccion.
- *   - Validacion de tipos (id y minStock deben ser enteros).
- *   - Autenticacion con bcrypt.compare (el hash nunca se compara en SQL).
+ *  Mismas funcionalidades, uso CORRECTO del ORM:
+ *   - LOGIN: busqueda parametrizada por username + verificacion con bcrypt
+ *            (el hash NUNCA se compara dentro del SQL).
+ *   - BUSCADOR: operador Op.like -> el termino viaja como PARAMETRO, Sequelize
+ *            lo escapa; NO se puede inyectar UNION ni extraer datos.
+ *   - Detalle: validacion de tipo + findByPk. Orden: whitelist.
  * =========================================================================== */
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -17,20 +16,18 @@ const { Product, User, Secret } = require('../db/models');
 
 const router = express.Router();
 
-// Whitelist para ORDER BY (defensa contra inyeccion de identificador).
 const SORT_WHITELIST = new Set(['id', 'name', 'price', 'stock', 'category']);
 const ORDER_WHITELIST = new Set(['ASC', 'DESC']);
 
 router.get('/', async (req, res) => {
   const q = (req.query.q || '').toString();
-  const sort  = SORT_WHITELIST.has(req.query.sort)  ? req.query.sort  : 'id';
+  const sort = SORT_WHITELIST.has(req.query.sort) ? req.query.sort : 'id';
   const order = ORDER_WHITELIST.has((req.query.order || '').toUpperCase())
     ? req.query.order.toUpperCase() : 'ASC';
   try {
-    // SEGURO: el valor de busqueda va como parametro (Sequelize lo escapa).
-    // sort/order ya quedaron restringidos a valores de la whitelist.
+    // SEGURO: q va como bind param (Sequelize lo escapa). No hay inyeccion posible.
     const products = await Product.findAll({
-      where: { name: { [Op.like]: '%' + q + '%' } },   // q NO entra al texto SQL: es un bind param
+      where: { name: { [Op.like]: '%' + q + '%' } },
       order: [[sort, order]],
     });
     res.render('home', { products, q, sort, order, error: null });
@@ -40,26 +37,13 @@ router.get('/', async (req, res) => {
 });
 
 router.get('/products/:id', async (req, res) => {
-  // SEGURO: validacion estricta de tipo antes de tocar la BD.
   const id = Number.parseInt(req.params.id, 10);
   if (!Number.isInteger(id) || id < 1) {
     return res.status(400).render('product', { product: null, error: 'ID invalido' });
   }
-  const product = await Product.findByPk(id);   // consulta parametrizada
+  const product = await Product.findByPk(id);
   if (!product) return res.status(404).render('product', { product: null, error: 'No encontrado' });
   res.render('product', { product, error: null });
-});
-
-router.get('/api/products', async (req, res) => {
-  const minStock = Number.parseInt(req.query.minStock, 10);
-  if (!Number.isInteger(minStock)) {
-    return res.status(400).json({ error: 'minStock debe ser un entero' });
-  }
-  const products = await Product.findAll({
-    attributes: ['id', 'name', 'price', 'stock'],
-    where: { stock: { [Op.gte]: minStock } },    // operador parametrizado
-  });
-  res.json({ count: products.length, products });
 });
 
 router.get('/login', (req, res) => res.render('login', { error: null, info: null }));
@@ -68,15 +52,13 @@ router.post('/login', async (req, res) => {
   const username = (req.body.username || '').toString();
   const password = (req.body.password || '').toString();
   try {
-    // SEGURO: busqueda parametrizada por username; el hash NUNCA entra al SQL.
+    // SEGURO: busqueda parametrizada; el hash nunca entra al SQL.
     const user = await User.findOne({ where: { username } });
-    // Comparacion de contrasena con bcrypt en la aplicacion.
     const ok = user && bcrypt.compareSync(password, user.password_hash);
     if (ok) {
       req.session.user = { id: user.id, username: user.username, role: user.role };
       return res.redirect('/panel');
     }
-    // Mensaje generico (no revela si el usuario existe).
     res.status(401).render('login', { error: 'Credenciales invalidas', info: null });
   } catch (err) {
     res.status(500).render('login', { error: 'Error interno', info: null });
