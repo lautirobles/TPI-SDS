@@ -1,17 +1,7 @@
   </main>
 
-  <% if (debugSqlEnabled && debugSql && debugSql.length) { %>
-    <section class="debug-panel">
-      <div class="terminal">
-        <div class="bar2"><i class="r"></i><i class="y"></i><i class="g"></i><span>SQL ejecutado &mdash; modo debug (did&aacute;ctico)</span></div>
-        <% debugSql.forEach(function(s){ %><pre><%= s %></pre><% }); %>
-      </div>
-    </section>
-  <% } %>
-
   <footer class="foot">
     <span>&#128722; <b>ShopLab</b> &mdash; laboratorio educativo de SQL Injection</span>
-    <span class="muted">Entorno de pruebas local &middot; no desplegar en producci&oacute;n</span>
   </footer>
 </body>
 </html>
