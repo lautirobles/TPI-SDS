@@ -57,8 +57,8 @@ services:
     image: owasp/modsecurity-crs:4.25-nginx-alpine-lts
     container_name: sqli-waf
     environment:
-      # Reverse proxy hacia la app vulnerable
-      BACKEND: http://app-vuln:3000
+      # Reverse proxy hacia la app segura
+      BACKEND: http://app-secure:3001
       PORT: "8080"
       SERVER_NAME: localhost
       # Motor en modo bloqueo con scoring de anomalias (CRS)
@@ -66,7 +66,7 @@ services:
       PARANOIA: "1"
       BLOCKING_PARANOIA: "1"
       ANOMALY_INBOUND: "5"
-      ANOMALY_OUTBOUND: "4"
+      ANOMALY_OUTBOUND: "20"
       MODSEC_AUDIT_ENGINE: "RelevantOnly"
       MODSEC_AUDIT_LOG: "/dev/stdout"
     ports:
